@@ -6,9 +6,9 @@
 a.tool-card { text-decoration: none; }
 .featured-tool { border-color: var(--accent); background: linear-gradient(140deg, #17383d, var(--panel)); }
 @media (max-width: 520px) {
-  .hero { padding-top: 32px; }
+  .hero { padding-top: 24px; }
   .hero-tools { display: block; width: fit-content; margin: 14px auto 0; }
   .top { flex-wrap: wrap; gap: 8px 14px; }
-  .hero h1 { font-size: clamp(2rem, 8.5vw, 2.65rem); margin: 14px 0; }
-  .hero p { margin-bottom: 18px; }
+  .hero h1 { font-size: clamp(1.85rem, 7vw, 2.2rem); line-height: 1.08; margin: 12px 0; }
+  .hero p { font-size: 1rem; line-height: 1.4; margin-bottom: 16px; }
 }
