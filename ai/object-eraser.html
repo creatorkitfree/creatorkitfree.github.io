@@ -1,0 +1,78 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Free Object Eraser for Photos | CreatorKit Free</title><meta name="description" content="Brush over an unwanted object and remove it from a photo with smart inpainting. Free browser-based image editing."><link rel="stylesheet" href="ai.css"></head><body><header><strong>✦ CreatorKit <span style="color:#74ebc5">Free</span></strong><nav><a href="../">All tools</a><a href="background-remover.html">AI Background Remover</a></nav></header><main><p class="muted">FREE PHOTO STUDIO / SMART ERASER</p><h1>Erase distractions <span>from photos.</span></h1><p class="muted">Brush over an unwanted object, then remove it with local image inpainting. Best for small objects against simple backgrounds.</p><section class="panel"><div class="controls"><input id="file" type="file" accept="image/*"><label>Brush <input id="brush" type="range" min="8" max="90" value="32"></label><button id="erase" disabled>Erase selected area</button><button id="undo" disabled>Undo</button><button id="save" disabled>Download image</button></div><p id="status" role="status">Choose a photo, then paint over an object.</p><canvas id="preview" width="640" height="420" aria-label="Photo editing canvas"></canvas></section><h2>How it works</h2><p>Use your finger or mouse to brush over an unwanted object, then tap Erase. The tool fills the brushed area using nearby pixels. It works best for small distractions and may leave artifacts on textured backgrounds.</p><p class="small muted">The photo is processed on your device.</p></main><footer>CreatorKit Free • <a href="../#privacy">Privacy</a></footer><script>
+const file=document.getElementById('file'),canvas=document.getElementById('preview'),ctx=canvas.getContext('2d',{willReadFrequently:true}),erase=document.getElementById('erase'),undo=document.getElementById('undo'),save=document.getElementById('save'),status=document.getElementById('status'),brush=document.getElementById('brush');let base=null,mask=null,history=[],drawing=false;
+function paint(){if(!base)return;ctx.putImageData(base,0,0);const overlay=document.createElement('canvas');overlay.width=canvas.width;overlay.height=canvas.height;const oc=overlay.getContext('2d');oc.putImageData(mask,0,0);ctx.save();ctx.globalAlpha=.55;ctx.drawImage(overlay,0,0);ctx.restore()}
+file.onchange=async()=>{const f=file.files[0];if(!f)return;try{const img=await createImageBitmap(f);const scale=Math.min(1,1000/img.width,1000/img.height);canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));ctx.drawImage(img,0,0,canvas.width,canvas.height);base=ctx.getImageData(0,0,canvas.width,canvas.height);mask=ctx.createImageData(canvas.width,canvas.height);history=[];erase.disabled=false;save.disabled=false;undo.disabled=true;status.textContent='Brush over the unwanted object in red.';img.close();}catch(e){status.textContent=e.message}};
+function point(e){const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height}}
+let prev;
+function stroke(e){if(!drawing||!mask)return;const p=point(e),rad=+brush.value/2,dx=p.x-prev.x,dy=p.y-prev.y,steps=Math.max(1,Math.ceil(Math.hypot(dx,dy)/Math.max(1,rad/2)));for(let s=0;s<=steps;s++){const cx=prev.x+dx*s/steps,cy=prev.y+dy*s/steps;for(let y=Math.max(0,Math.floor(cy-rad));y<Math.min(canvas.height,Math.ceil(cy+rad));y++)for(let x=Math.max(0,Math.floor(cx-rad));x<Math.min(canvas.width,Math.ceil(cx+rad));x++){if((x-cx)**2+(y-cy)**2<=rad*rad){const k=(y*canvas.width+x)*4;mask.data[k]=255;mask.data[k+1]=65;mask.data[k+2]=80;mask.data[k+3]=255}}}prev=p;paint()}
+canvas.onpointerdown=e=>{if(!base||file.disabled)return;drawing=true;prev=point(e);canvas.setPointerCapture(e.pointerId);stroke(e)};canvas.onpointermove=stroke;canvas.onpointerup=()=>drawing=false;canvas.onpointercancel=()=>drawing=false;
+function inpaint(image, selection) {
+  const {width, height, data} = image;
+  const total = width * height;
+  const pixels = new Uint8ClampedArray(data);
+  const pending = new Uint8Array(total);
+  const queue = new Int32Array(total);
+  let head = 0;
+  let tail = 0;
+  for (let i = 0; i < total; i++) pending[i] = selection.data[i * 4 + 3] ? 1 : 0;
+
+  function enqueue(i) {
+    pending[i] = 2;
+    queue[tail++] = i;
+  }
+
+  for (let i = 0; i < total; i++) {
+    if (!pending[i]) continue;
+    const x = i % width;
+    if ((x > 0 && !pending[i - 1]) || (x < width - 1 && !pending[i + 1]) ||
+        (i >= width && !pending[i - width]) || (i + width < total && !pending[i + width])) enqueue(i);
+  }
+  if (!tail) throw new Error('Leave some of the surrounding photo unselected.');
+
+  while (head < tail) {
+    const i = queue[head++];
+    const x = i % width;
+    const y = Math.floor(i / width);
+    const channels = [0, 0, 0, 0];
+    let totalWeight = 0;
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        if ((!dx && !dy) || x + dx < 0 || x + dx >= width || y + dy < 0 || y + dy >= height) continue;
+        const neighbor = i + dy * width + dx;
+        if (pending[neighbor]) {
+          if (pending[neighbor] === 1 && Math.abs(dx) + Math.abs(dy) === 1) enqueue(neighbor);
+          continue;
+        }
+        const weight = 1 / (dx * dx + dy * dy);
+        for (let channel = 0; channel < 4; channel++) channels[channel] += pixels[neighbor * 4 + channel] * weight;
+        totalWeight += weight;
+      }
+    }
+    for (let channel = 0; channel < 4; channel++) pixels[i * 4 + channel] = channels[channel] / totalWeight;
+    pending[i] = 0;
+  }
+  return new ImageData(pixels, width, height);
+}
+
+erase.onclick = () => {
+  if (!base) return;
+  if (!mask.data.some((value, index) => index % 4 === 3 && value)) {
+    status.textContent = 'Brush over the unwanted object first.';
+    return;
+  }
+  try {
+    const output = inpaint(base, mask);
+    history.push(base);
+    if (history.length > 5) history.shift();
+    base = output;
+    mask = ctx.createImageData(canvas.width, canvas.height);
+    paint();
+    undo.disabled = false;
+    status.textContent = 'Done. Review the result and download, or undo and try a smaller brush.';
+  } catch (error) {
+    status.textContent = error.message;
+  }
+};
+undo.onclick=()=>{if(!history.length)return;base=history.pop();mask=ctx.createImageData(canvas.width,canvas.height);paint();undo.disabled=!history.length;status.textContent='Previous image restored.'};
+save.onclick=()=>{if(!base)return;const c=document.createElement('canvas');c.width=canvas.width;c.height=canvas.height;c.getContext('2d').putImageData(base,0,0);c.toBlob(b=>{if(!b)return;const url=URL.createObjectURL(b),a=document.createElement('a');a.href=url;a.download='creatorkit-object-erased.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)},'image/png')};
+</script></body></html>
