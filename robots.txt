@@ -1,3 +1,4 @@
 User-agent: *
 Allow: /
-# Add a Sitemap URL after you know your public domain.
+
+Sitemap: https://creatorkitfree.github.io/sitemap.xml
