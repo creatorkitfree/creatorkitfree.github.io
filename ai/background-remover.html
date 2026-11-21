@@ -13,10 +13,10 @@ file.onchange=async()=>{const f=file.files[0];if(!f)return;try{const img=await c
 run.onclick=async()=>{if(!source)return;run.disabled=true;file.disabled=true;save.disabled=true;status.textContent='Loading AI model / processing image. First run may take a moment…';try{
 if (!segmenter) {
   if (!globalThis.tf) await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js');
-  if (!globalThis.bodyPix) await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.umd.js');
+  if (!globalThis['body-pix']) await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.umd.js');
   await tf.setBackend('cpu');
   await tf.ready();
-  segmenter = await bodyPix.load({architecture:'MobileNetV1', outputStride:16, multiplier:0.5, quantBytes:2});
+  segmenter = await globalThis['body-pix'].load({architecture:'MobileNetV1', outputStride:16, multiplier:0.5, quantBytes:2});
 }
 const input = document.createElement('canvas');
 const scale = Math.min(1, 384 / canvas.width, 384 / canvas.height);
