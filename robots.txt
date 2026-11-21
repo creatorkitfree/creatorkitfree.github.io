@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+# Add a Sitemap URL after you know your public domain.
